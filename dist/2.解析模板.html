@@ -2,31 +2,43 @@
 <html lang="en">
 
 <head>
-  <meta charset="UTF-8">
-  <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Document</title>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>2.解析模板</title>
 </head>
 
 <body>
+  <div id="app" style="color: red;background-color: aqua">
+    <div style="color: red">{{name}}hello{{age}}</div>
+    <span>world</span>
+  </div>
   <script src="./vue.js"></script>
   <script>
     const vm = new Vue({
+      el: '#app',
       data() {
         return {
           name: 'mayuhang',
           age: 20,
           adds: {
             a: 1,
-            b: 2
+            b: 2,
           },
-          hobbt: ['eat', { a: 1 }]
-        }
-      }
-    })
-    vm.hobbt.unshift(['name'])
-    vm.hobbt[0].push('aaa')
-    console.log(vm);
+          hobbt: ['eat', { a: 1 }],
+        };
+      },
+      // template:`
+      // <div>哈哈哈</div>`
+      // render(h) {
+
+      // },
+    });
+      // vm.$mount('#app')
+      // 1.模板引擎 性能差 需要正则匹配替换 1.0的时候没有引入虚拟DOM
+      // 2.采用虚拟DOM，数据变化后比较虚拟DOM的差异 最后更新需要更新的地方
+      // 3.核心就是将模板变成我们的js语法，通过js语法生成虚拟DOM
+      // 需要先变成ast语法树再重新组装代码成为新的语法，将template语法转换成render函数
   </script>
 </body>
 

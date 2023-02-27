@@ -8,6 +8,7 @@ export function initState(vm) {
 }
 
 // 当用户访问vm.xxx时 实际访问的是vm._data.xxx
+// 用户代理
 function proxy(vm, target, key) {
   Object.defineProperty(vm, key, {
     get() {

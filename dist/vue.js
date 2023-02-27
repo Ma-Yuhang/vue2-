@@ -4,6 +4,33 @@
   (global = typeof globalThis !== 'undefined' ? globalThis : global || self, global.Vue = factory());
 })(this, (function () { 'use strict';
 
+  function _iterableToArrayLimit(arr, i) {
+    var _i = null == arr ? null : "undefined" != typeof Symbol && arr[Symbol.iterator] || arr["@@iterator"];
+    if (null != _i) {
+      var _s,
+        _e,
+        _x,
+        _r,
+        _arr = [],
+        _n = !0,
+        _d = !1;
+      try {
+        if (_x = (_i = _i.call(arr)).next, 0 === i) {
+          if (Object(_i) !== _i) return;
+          _n = !1;
+        } else for (; !(_n = (_s = _x.call(_i)).done) && (_arr.push(_s.value), _arr.length !== i); _n = !0);
+      } catch (err) {
+        _d = !0, _e = err;
+      } finally {
+        try {
+          if (!_n && null != _i.return && (_r = _i.return(), Object(_r) !== _r)) return;
+        } finally {
+          if (_d) throw _e;
+        }
+      }
+      return _arr;
+    }
+  }
   function _typeof(obj) {
     "@babel/helpers - typeof";
 
@@ -35,6 +62,28 @@
     });
     return Constructor;
   }
+  function _slicedToArray(arr, i) {
+    return _arrayWithHoles(arr) || _iterableToArrayLimit(arr, i) || _unsupportedIterableToArray(arr, i) || _nonIterableRest();
+  }
+  function _arrayWithHoles(arr) {
+    if (Array.isArray(arr)) return arr;
+  }
+  function _unsupportedIterableToArray(o, minLen) {
+    if (!o) return;
+    if (typeof o === "string") return _arrayLikeToArray(o, minLen);
+    var n = Object.prototype.toString.call(o).slice(8, -1);
+    if (n === "Object" && o.constructor) n = o.constructor.name;
+    if (n === "Map" || n === "Set") return Array.from(o);
+    if (n === "Arguments" || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(n)) return _arrayLikeToArray(o, minLen);
+  }
+  function _arrayLikeToArray(arr, len) {
+    if (len == null || len > arr.length) len = arr.length;
+    for (var i = 0, arr2 = new Array(len); i < len; i++) arr2[i] = arr[i];
+    return arr2;
+  }
+  function _nonIterableRest() {
+    throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.");
+  }
   function _toPrimitive(input, hint) {
     if (typeof input !== "object" || input === null) return input;
     var prim = input[Symbol.toPrimitive];
@@ -48,6 +97,183 @@
   function _toPropertyKey(arg) {
     var key = _toPrimitive(arg, "string");
     return typeof key === "symbol" ? key : String(key);
+  }
+
+  var ncname = "[a-zA-Z_][\\-\\.0-9_a-zA-Z]*";
+  var qnameCapture = "((?:".concat(ncname, "\\:)?").concat(ncname, ")");
+  var startTagOpan = new RegExp("^<".concat(qnameCapture));
+  var endTag = new RegExp("^<\\/".concat(qnameCapture, "[^>]*>"));
+  // 匹配属性
+  var attribute = /^\s*([^\s"'<>\/=]+)(?:\s*(=)\s*(?:"([^"]*)"+|'([^']*)'+|([^\s"'=<>']+)))?/;
+  var startTagClose = /^\s*(\/?)>/;
+
+  // 对模板进行编译处理
+  function parseHTML(html) {
+    var ELEMENT_TYPE = 1;
+    var TEXT_TYPE = 3;
+    var stack = []; // 用于存放元素的栈
+    var currentParent; // 指向的是栈中的最后一个
+    var root;
+    function createASTElement(tag, attrs) {
+      return {
+        tag: tag,
+        type: ELEMENT_TYPE,
+        children: [],
+        attrs: attrs,
+        parent: null
+      };
+    }
+    function start(tag, attrs) {
+      var node = createASTElement(tag, attrs);
+      if (!root) {
+        // 一上来没有root时
+        root = node;
+      }
+      if (currentParent) {
+        node.parent = currentParent;
+        currentParent.children.push(node);
+      }
+      stack.push(node); // 添加到栈中
+      currentParent = node; // currentParent为栈中的最后一个
+    }
+
+    function chars(text) {
+      text = text.replace(/\s/g, '');
+      text && currentParent.children.push({
+        type: TEXT_TYPE,
+        text: text,
+        parent: currentParent
+      });
+    }
+    function end(tag) {
+      stack.pop(); // 弹出最后一个
+      currentParent = stack[stack.length - 1];
+    }
+    function advance(n) {
+      html = html.slice(n);
+    }
+    function parseStartTag() {
+      var start = html.match(startTagOpan);
+      if (start) {
+        var match = {
+          tagName: start[1],
+          attrs: []
+        };
+        advance(start[0].length); // <div
+        // console.log(match, html);
+        var attr, _end;
+        while (!(_end = html.match(startTagClose)) && (attr = html.match(attribute))) {
+          advance(attr[0].length);
+          match.attrs.push({
+            name: attr[1],
+            value: attr[3] || attr[4] || attr[5] || true
+          });
+        }
+        if (_end) {
+          advance(_end[0].length);
+        }
+        // console.log(match);
+        return match;
+      }
+      return false;
+    }
+    while (html) {
+      // 如果textend等于0说明是开始标签
+      // 如果textend > 0说明文本结束
+      var textEnd = html.indexOf('<');
+      if (textEnd === 0) {
+        var startTagMatch = parseStartTag(); // 开始标签的匹配结果
+        if (startTagMatch) {
+          start(startTagMatch.tagName, startTagMatch.attrs);
+          continue;
+        }
+        var endTagMatch = html.match(endTag);
+        if (endTagMatch) {
+          advance(endTagMatch[0].length);
+          end(endTagMatch[1]);
+          continue;
+        }
+      }
+      if (textEnd > 0) {
+        var text = html.substring(0, textEnd); // 文本内容
+        if (text) {
+          chars(text);
+          advance(text.length);
+        }
+      }
+    }
+    return root;
+  }
+
+  function genProps(attrs) {
+    // console.log(attrs, '1');
+    var str = '';
+    attrs.forEach(function (attr) {
+      if (attr.name == 'style') {
+        var obj = {};
+        attr.value.split(';').forEach(function (item) {
+          if (!item) return;
+          var _item$split = item.split(':'),
+            _item$split2 = _slicedToArray(_item$split, 2),
+            key = _item$split2[0],
+            value = _item$split2[1];
+          obj[key] = value.trim();
+        });
+        attr.value = obj;
+      }
+      str += "".concat(attr.name, ":").concat(JSON.stringify(attr.value), ",");
+    });
+    return "{".concat(str.slice(0, -1), "}");
+  }
+  // 匹配{{}}
+  var defaultTagClose = /\{\{((?:.|\r?\n)+?)\}\}/g;
+  function gen(child) {
+    if (child.type === 1) {
+      // 是元素节点继续生成code
+      return codegen(child);
+    } else {
+      // console.log(child);
+      var text = child.text;
+      if (!defaultTagClose.test(text)) {
+        return "_v(".concat(JSON.stringify(text), ")");
+      } else {
+        var tokens = [];
+        var match;
+        defaultTagClose.lastIndex = 0;
+        var lastIndex = 0;
+        while (match = defaultTagClose.exec(text)) {
+          var index = match.index; // 匹配的位置 {{name}} hello  {{name}}  hello
+          if (index > lastIndex) {
+            tokens.push(JSON.stringify(text.slice(lastIndex, index)));
+          }
+          tokens.push("_s(".concat(match[1].trim(), ")"));
+          lastIndex = index + match[0].length;
+        }
+        if (lastIndex < text.length) {
+          tokens.push(text.slice(lastIndex));
+        }
+        return "_v(".concat(tokens.join('+'), ")");
+      }
+    }
+  }
+  function genChildren(children) {
+    return children.map(function (child) {
+      return gen(child);
+    }).join(',');
+  }
+  function codegen(ast) {
+    var children = genChildren(ast.children);
+    var code = "_c('".concat(ast.tag, "',").concat(ast.attrs.length > 0 ? genProps(ast.attrs) : null).concat(ast.children.length > 0 ? ",".concat(children) : '', ")");
+    return code;
+  }
+  function compileToFunction(template) {
+    // 1.将template转换成ast语法树
+    var ast = parseHTML(template);
+    // console.log(ast);
+    // 2.根据ast生成render函数（render函数执行后的结果就是虚拟DOM）
+    console.log(codegen(ast));
+
+    // 3.生成真实DOM
   }
 
   // 重写数组的7个变异方法，并且保留数组原来的方法
@@ -154,6 +380,7 @@
   }
 
   // 当用户访问vm.xxx时 实际访问的是vm._data.xxx
+  // 用户代理
   function proxy(vm, target, key) {
     Object.defineProperty(vm, key, {
       get: function get() {
@@ -183,6 +410,29 @@
 
       // 初始化数据
       initState(vm);
+      if (options.el) {
+        vm.$mount(options.el);
+      }
+    };
+    Vue.prototype.$mount = function (el) {
+      var vm = this;
+      el = document.querySelector(el);
+      if (!el) {
+        console.log('没有el');
+      }
+      var opts = vm.$options;
+      if (!opts.render) {
+        // 如果没有写render函数
+        var template;
+        if (!opts.template && el) {
+          // 没有写template但是写了el
+          template = el.outerHTML;
+        } else if (opts.template && el) {
+          template = opts.template;
+        }
+        var render = compileToFunction(template);
+        opts.render = render;
+      }
     };
   }
 
