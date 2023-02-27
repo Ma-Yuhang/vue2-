@@ -50,10 +50,56 @@
     return typeof key === "symbol" ? key : String(key);
   }
 
+  // 重写数组的7个变异方法，并且保留数组原来的方法
+
+  var oldArrayPrototype = Array.prototype;
+  var newArrayPrototype = Object.create(oldArrayPrototype);
+  var methods = ['push', 'pop', 'unshift', 'shift', 'reverse', 'sort', 'replace'];
+  methods.forEach(function (method) {
+    // 重写这7个方法
+    newArrayPrototype[method] = function () {
+      var _oldArrayPrototype$me;
+      for (var _len = arguments.length, args = new Array(_len), _key = 0; _key < _len; _key++) {
+        args[_key] = arguments[_key];
+      }
+      var res = (_oldArrayPrototype$me = oldArrayPrototype[method]).call.apply(_oldArrayPrototype$me, [this].concat(args));
+      console.log('调用了' + method);
+      var inserted;
+      var ob = this.__ob__;
+      // 监测用户用push、unshift、splice方法添加数据
+      switch (method) {
+        case 'push':
+        case 'unshift':
+          // arr.push({a:1})
+          inserted = args;
+          break;
+        case 'splice':
+          // arr.splice(0,1,{a:1},{b:2})
+          inserted = args.slice(2);
+          break;
+      }
+      if (inserted) {
+        ob.observeArray(inserted);
+      }
+      return res;
+    };
+  });
+
   var Observer = /*#__PURE__*/function () {
     function Observer(data) {
       _classCallCheck(this, Observer);
-      this.walk(data);
+      Object.defineProperty(data, '__ob__', {
+        value: this,
+        enumerable: false // 不可枚举
+      });
+
+      if (Array.isArray(data)) {
+        // 在这里重写数组中的7中变异方法
+        data.__proto__ = newArrayPrototype;
+        this.observeArray(data); // 如果数组中有对象，可以监测到变化
+      } else {
+        this.walk(data);
+      }
     }
     _createClass(Observer, [{
       key: "walk",
@@ -61,6 +107,14 @@
         // 循环对象 对属性依次劫持
         Object.keys(data).forEach(function (key) {
           return defineReactive(data, key, data[key]);
+        });
+      }
+    }, {
+      key: "observeArray",
+      value: function observeArray(data) {
+        // 对数组进行处理
+        data.forEach(function (item) {
+          return observe(item);
         });
       }
     }]);
@@ -75,6 +129,7 @@
       },
       set: function set(newValue) {
         if (value === newValue) return;
+        observe(newValue); // 用户可能修改一整个对象 vm.adds = {}
         value = newValue;
       }
     });
@@ -83,6 +138,10 @@
     // 对这个对象进行劫持
     if (_typeof(data) !== 'object' || data == null) {
       return;
+    }
+    if (data.__ob__ instanceof Observer) {
+      // 说明被观测过了
+      return data.__ob__;
     }
     return new Observer(data);
   }

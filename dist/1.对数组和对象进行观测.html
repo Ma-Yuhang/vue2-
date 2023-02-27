@@ -19,10 +19,13 @@
           adds: {
             a: 1,
             b: 2
-          }
+          },
+          hobbt: ['eat', { a: 1 }]
         }
       }
     })
+    vm.hobbt.unshift(['name'])
+    vm.hobbt[0].push('aaa')
     console.log(vm);
   </script>
 </body>
