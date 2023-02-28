@@ -1,4 +1,5 @@
 import { newArrayPrototype } from "./array"
+import Dep from "./dep"
 
 class Observer {
   constructor(data) {
@@ -24,15 +25,20 @@ class Observer {
 
 export function defineReactive(target, key, value) {
   observe(value) // 递归调用 多层结构添加getter setter
+  let dep = new Dep()  // 每一个属性都有一个dep
   // 重新定义每个属性 对每个属性添加getter setter
   Object.defineProperty(target, key, {
     get() {
+      if(Dep.target) {
+        dep.depend() // 让这个属性的收集器记住当前的watcher
+      }
       return value
     },
     set(newValue) {
       if (value === newValue) return
       observe(newValue) // 用户可能修改一整个对象 vm.adds = {}
       value = newValue
+      dep.notify() // 通知更新
     }
   })
 }

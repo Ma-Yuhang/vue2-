@@ -10,7 +10,7 @@
 
 <body>
   <div id="app" style="color: red;background-color: aqua">
-    <div style="color: pink;">{{name}}hello{{age}}</div>
+    <div style="color: pink;">{{name}} hello {{age}}   {{age}}</div>
     <span>world</span>
   </div>
   <script src="./vue.js"></script>
@@ -29,10 +29,10 @@
         };
       },
     });
-    // setTimeout(() => {
-    //   vm.name = 'adadadada'
-    //   vm._update(vm._render()) // 下一步需要当数据变化时自动更新模板（观察者模式）
-    // }, 2000);
+    setTimeout(() => {
+      vm.name = 'adadadada'
+      // vm._update(vm._render()) // 下一步需要当数据变化时自动更新模板（观察者模式）
+    }, 2000);
   </script>
 </body>
 

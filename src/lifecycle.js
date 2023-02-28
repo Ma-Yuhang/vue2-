@@ -1,3 +1,4 @@
+import Watcher from "./observe/watcher"
 import { createElementVNode, createTextVNode } from "./vdom"
 
 function patchProps(el, props) {
@@ -70,6 +71,9 @@ export function mountComponent(vm, el) {
   vm.$el = el
   // 1.调用render函数 生成虚拟节点 vm._render()调用的就是vm.$options
   // 2.根据虚拟DOM生成真实DOM vm._update()
-  vm._update(vm._render())
-  // 3.挂载到el中
+  const updateComponent = () => {
+    vm._update(vm._render())
+  }
+  const watcher = new Watcher(vm, updateComponent, true)
+  console.log(watcher);
 }

@@ -278,6 +278,80 @@
     return render;
   }
 
+  var id$1 = 0;
+  var Dep = /*#__PURE__*/function () {
+    function Dep() {
+      _classCallCheck(this, Dep);
+      this.id = id$1++;
+      this.subs = []; // 这里对应着当前属性对应的watcher有哪些
+    }
+    _createClass(Dep, [{
+      key: "depend",
+      value: function depend() {
+        // 不希望记录重复的watcher，而且刚才值是一个单向的关系 dep -> watcher
+        // watcher 记录 dep
+        // this.subs.push(Dep.target)
+
+        Dep.target.addDep(this); // 让watcher记住dep
+      }
+    }, {
+      key: "addSub",
+      value: function addSub(watcher) {
+        this.subs.push(watcher);
+      }
+    }, {
+      key: "notify",
+      value: function notify() {
+        this.subs.forEach(function (watcher) {
+          return watcher.update();
+        });
+      }
+    }]);
+    return Dep;
+  }();
+  Dep.target = null;
+
+  var id = 0;
+
+  // 1.当我们创建渲染watcher时我们会把当前的渲染watcher放到Dep.target上
+  // 2.调用_render() 会取值 走到get上
+  var Watcher = /*#__PURE__*/function () {
+    function Watcher(vm, fn, options) {
+      _classCallCheck(this, Watcher);
+      // 不同的组件有不同的watcher
+      this.id = id++;
+      this.renderWatcher = options; // true表示是一个渲染过程
+      this.getter = fn;
+      this.deps = []; // 记住dep 后边实现计算属性和清理工作需要用到
+      this.depsId = new Set();
+      this.get();
+    }
+    _createClass(Watcher, [{
+      key: "addDep",
+      value: function addDep(dep) {
+        var id = dep.id;
+        if (!this.depsId.has(id)) {
+          this.deps.push(dep);
+          this.depsId.add(id);
+          dep.addSub(this); // 让dep记住watcher
+        }
+      }
+    }, {
+      key: "get",
+      value: function get() {
+        Dep.target = this; // 静态属性只有一份
+        this.getter(); // 会去vm上取值
+        Dep.target = null;
+      }
+    }, {
+      key: "update",
+      value: function update() {
+        this.get(); // 重新渲染
+      }
+    }]);
+    return Watcher;
+  }(); // 需要给每个属性增加一个dep 目的就是收集watcher
+
   function createElementVNode(vm, tag, data) {
     if (data == null) {
       data = {};
@@ -383,8 +457,11 @@
     vm.$el = el;
     // 1.调用render函数 生成虚拟节点 vm._render()调用的就是vm.$options
     // 2.根据虚拟DOM生成真实DOM vm._update()
-    vm._update(vm._render());
-    // 3.挂载到el中
+    var updateComponent = function updateComponent() {
+      vm._update(vm._render());
+    };
+    var watcher = new Watcher(vm, updateComponent, true);
+    console.log(watcher);
   }
 
   // 重写数组的7个变异方法，并且保留数组原来的方法
@@ -459,18 +536,25 @@
   }();
   function defineReactive(target, key, value) {
     observe(value); // 递归调用 多层结构添加getter setter
+    var dep = new Dep(); // 每一个属性都有一个dep
     // 重新定义每个属性 对每个属性添加getter setter
     Object.defineProperty(target, key, {
       get: function get() {
+        if (Dep.target) {
+          dep.depend(); // 让这个属性的收集器记住当前的watcher
+        }
+
         return value;
       },
       set: function set(newValue) {
         if (value === newValue) return;
         observe(newValue); // 用户可能修改一整个对象 vm.adds = {}
         value = newValue;
+        dep.notify(); // 通知更新
       }
     });
   }
+
   function observe(data) {
     // 对这个对象进行劫持
     if (_typeof(data) !== 'object' || data == null) {
