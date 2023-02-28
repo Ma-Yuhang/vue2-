@@ -60,7 +60,9 @@ export function compileToFunction(template) {
   let ast = parseHTML(template)
   // console.log(ast);
   // 2.根据ast生成render函数（render函数执行后的结果就是虚拟DOM）
-  console.log(codegen(ast));
-
-  // 3.生成真实DOM
+  let code = codegen(ast)
+  // console.log(code);
+  code = `with(this){return ${code}}`
+  let render = new Function(code) // 根据代码生成render函数
+  return render
 }

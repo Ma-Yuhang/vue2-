@@ -5,7 +5,7 @@
   <meta charset="UTF-8" />
   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>2.解析模板</title>
+  <title>3.数据变化自动更新模板</title>
 </head>
 
 <body>
@@ -28,21 +28,11 @@
           hobbt: ['eat', { a: 1 }],
         };
       },
-      // template:`
-      // <div>哈哈哈</div>`
-      // render(h) {
-
-      // },
     });
     // setTimeout(() => {
     //   vm.name = 'adadadada'
     //   vm._update(vm._render()) // 下一步需要当数据变化时自动更新模板（观察者模式）
     // }, 2000);
-      // vm.$mount('#app')
-      // 1.模板引擎 性能差 需要正则匹配替换 1.0的时候没有引入虚拟DOM
-      // 2.采用虚拟DOM，数据变化后比较虚拟DOM的差异 最后更新需要更新的地方
-      // 3.核心就是将模板变成我们的js语法，通过js语法生成虚拟DOM
-      // 需要先变成ast语法树再重新组装代码成为新的语法，将template语法转换成render函数
   </script>
 </body>
 

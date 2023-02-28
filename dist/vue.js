@@ -271,9 +271,120 @@
     var ast = parseHTML(template);
     // console.log(ast);
     // 2.根据ast生成render函数（render函数执行后的结果就是虚拟DOM）
-    console.log(codegen(ast));
+    var code = codegen(ast);
+    // console.log(code);
+    code = "with(this){return ".concat(code, "}");
+    var render = new Function(code); // 根据代码生成render函数
+    return render;
+  }
 
-    // 3.生成真实DOM
+  function createElementVNode(vm, tag, data) {
+    if (data == null) {
+      data = {};
+    }
+    var key = data.key;
+    if (key) {
+      delete data.key;
+    }
+    for (var _len = arguments.length, children = new Array(_len > 3 ? _len - 3 : 0), _key = 3; _key < _len; _key++) {
+      children[_key - 3] = arguments[_key];
+    }
+    return vnode(vm, tag, key, data, children);
+  }
+  function createTextVNode(vm, text) {
+    return vnode(vm, undefined, undefined, undefined, undefined, text);
+  }
+  function vnode(vm, tag, key, data, children, text) {
+    return {
+      vm: vm,
+      tag: tag,
+      key: key,
+      data: data,
+      children: children,
+      text: text
+    };
+  }
+
+  function patchProps(el, props) {
+    for (var key in props) {
+      if (key === 'style') {
+        for (var styleName in props.style) {
+          el.style[styleName] = props.style[styleName];
+        }
+      } else {
+        el.setAttribute(key, props[key]);
+        // el[key] = props[key]
+      }
+    }
+  }
+  // 创建真实DOM
+  function createElm(vnode) {
+    var tag = vnode.tag,
+      data = vnode.data,
+      children = vnode.children,
+      text = vnode.text;
+    if (typeof tag === 'string') {
+      vnode.el = document.createElement(tag); // 这里将真实节点和虚拟节点对应起来
+      patchProps(vnode.el, data);
+      children.forEach(function (item) {
+        vnode.el.appendChild(createElm(item));
+      });
+    } else {
+      vnode.el = document.createTextNode(text);
+    }
+    return vnode.el;
+  }
+  function patch(oldVNode, vnode) {
+    // 判断是不是初始 是不是真实DOM
+    var isRealElement = oldVNode.nodeType;
+    if (isRealElement) {
+      var parentElm = oldVNode.parentNode; // 拿到旧的真实DOM的父元素
+      // 创建新的真实DOM
+      var newElm = createElm(vnode);
+      parentElm.removeChild(oldVNode);
+      parentElm.insertBefore(newElm, oldVNode.nextsibiling);
+      console.log(vnode);
+      console.log(newElm);
+      return newElm;
+    }
+  }
+  function initLifeCycle(Vue) {
+    Vue.prototype._c = function () {
+      for (var _len = arguments.length, args = new Array(_len), _key = 0; _key < _len; _key++) {
+        args[_key] = arguments[_key];
+      }
+      // createElementVNode
+      return createElementVNode.apply(void 0, [this].concat(args));
+    };
+    Vue.prototype._v = function () {
+      for (var _len2 = arguments.length, args = new Array(_len2), _key2 = 0; _key2 < _len2; _key2++) {
+        args[_key2] = arguments[_key2];
+      }
+      // createTextVNode
+      return createTextVNode.apply(void 0, [this].concat(args));
+    };
+    Vue.prototype._s = function (value) {
+      // 变成字符串
+      if (_typeof(value) !== 'object') return value;
+      return JSON.stringify(value);
+    };
+    Vue.prototype._render = function () {
+      return this.$options.render.call(this);
+    };
+    Vue.prototype._update = function (vnode) {
+      var el = this.$el;
+      // console.log(vnode, el);
+
+      // 既有初始化的功能，又有更新的功能
+      this.$el = patch(el, vnode);
+    };
+  }
+  function mountComponent(vm, el) {
+    vm.$el = el;
+    // 1.调用render函数 生成虚拟节点 vm._render()调用的就是vm.$options
+    // 2.根据虚拟DOM生成真实DOM vm._update()
+    vm._update(vm._render());
+    // 3.挂载到el中
   }
 
   // 重写数组的7个变异方法，并且保留数组原来的方法
@@ -433,13 +544,15 @@
         var render = compileToFunction(template);
         opts.render = render;
       }
+      mountComponent(vm, el); // 组件挂载 调用render
     };
   }
 
   function Vue(options) {
     this._init(options);
   }
-  initMixin(Vue);
+  initMixin(Vue); // 扩展init方法
+  initLifeCycle(Vue); //
 
   return Vue;
 
