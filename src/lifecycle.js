@@ -36,8 +36,8 @@ function patch(oldVNode, vnode) {
     const newElm = createElm(vnode)
     parentElm.removeChild(oldVNode)
     parentElm.insertBefore(newElm, oldVNode.nextsibiling)
-    console.log(vnode);
-    console.log(newElm);
+    // console.log(vnode);
+    // console.log(newElm);
     return newElm
   } else {
     // diff算法
@@ -75,5 +75,12 @@ export function mountComponent(vm, el) {
     vm._update(vm._render())
   }
   const watcher = new Watcher(vm, updateComponent, true)
-  console.log(watcher);
+  // console.log(watcher);
+}
+
+export function callHook(vm, hook) {
+  const handlers = vm.$options[hook]
+  if (handlers) {
+    handlers.forEach(hook => hook.call(vm))
+  }
 }

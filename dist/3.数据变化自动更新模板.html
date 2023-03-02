@@ -10,11 +10,12 @@
 
 <body>
   <div id="app" style="color: red;background-color: aqua">
-    <div style="color: pink;">{{name}} hello {{age}}   {{age}}</div>
+    <div style="color: pink;">{{name}} hello {{age}} {{age}}</div>
     <span>world</span>
   </div>
   <script src="./vue.js"></script>
   <script>
+
     const vm = new Vue({
       el: '#app',
       data() {
@@ -28,11 +29,23 @@
           hobbt: ['eat', { a: 1 }],
         };
       },
+      created() {
+        console.log(3);
+      },
     });
-    setTimeout(() => {
-      vm.name = 'adadadada'
-      // vm._update(vm._render()) // 下一步需要当数据变化时自动更新模板（观察者模式）
-    }, 2000);
+    Vue.mixin({
+      data: { a: 1 },
+      created() {
+        console.log(1);
+      }
+    })
+    Vue.mixin({
+      data: { a: 2 },
+      created() {
+        console.log(2);
+      }
+    })
+    console.log(Vue.options);
   </script>
 </body>
 

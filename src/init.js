@@ -1,15 +1,18 @@
 import { compileToFunction } from "./compiler"
-import { mountComponent } from "./lifecycle"
+import { callHook, mountComponent } from "./lifecycle"
 import { initState } from "./state"
+import { mergeOptions } from "./utils"
 
 export function initMixin(Vue) { // 给Vue添加init方法
   Vue.prototype._init = function (options) {
     const vm = this
-    vm.$options = options // 将用户的选项挂载到实例上
+    vm.$options = mergeOptions(this.constructor.options, options) // 将用户的选项挂载到实例上
+    callHook(vm, 'beforeCreate') // 调用beforeCreate生命周期钩子
 
     // 初始化数据
     initState(vm)
 
+    callHook(vm, 'created')  // 调用created生命周期钩子
     if (options.el) {
       vm.$mount(options.el)
     }
@@ -32,6 +35,6 @@ export function initMixin(Vue) { // 给Vue添加init方法
       const render = compileToFunction(template)
       opts.render = render
     }
-    mountComponent(vm,el) // 组件挂载 调用render
+    mountComponent(vm, el) // 组件挂载 调用render
   }
 }

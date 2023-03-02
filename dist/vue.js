@@ -4,6 +4,53 @@
   (global = typeof globalThis !== 'undefined' ? globalThis : global || self, global.Vue = factory());
 })(this, (function () { 'use strict';
 
+  var strats = {};
+  var LIFECYCLE = ['beforeCreate', 'created', 'beforeMount', 'mounted', 'beforeUpdate', 'updated', 'beforeDestroy', 'destroyed'];
+  LIFECYCLE.forEach(function (hook) {
+    strats[hook] = function (p, c) {
+      if (c) {
+        if (p) {
+          return p.concat(c);
+        } else {
+          return [c];
+        }
+      } else {
+        return p;
+      }
+    };
+  });
+  function mergeOptions(parent, child) {
+    // 合并两个对象
+    var options = {};
+    for (var key in parent) {
+      mergeField(key);
+    }
+    for (var _key in child) {
+      if (!parent.hasOwnProperty(_key)) {
+        mergeField(_key);
+      }
+    }
+    function mergeField(key) {
+      if (strats[key]) {
+        // 证明是生命周期钩子 需要合并成数组
+        options[key] = strats[key](parent[key], child[key]);
+      } else {
+        options[key] = child[key] || parent[key];
+      }
+    }
+    return options;
+  }
+
+  function initGlobalAPI(Vue) {
+    Vue.options = {};
+    Vue.mixin = function (mixin) {
+      // 合并mixin 其他属性以后边的为准 而生命周期函数需要都保存起来
+      // 例如：{a: 1, created: f1} {a:2, created: f2} => {a: 2, created: [f1,f2]}
+      this.options = mergeOptions(this.options, mixin);
+      return this;
+    };
+  }
+
   function _iterableToArrayLimit(arr, i) {
     var _i = null == arr ? null : "undefined" != typeof Symbol && arr[Symbol.iterator] || arr["@@iterator"];
     if (null != _i) {
@@ -65,8 +112,17 @@
   function _slicedToArray(arr, i) {
     return _arrayWithHoles(arr) || _iterableToArrayLimit(arr, i) || _unsupportedIterableToArray(arr, i) || _nonIterableRest();
   }
+  function _toConsumableArray(arr) {
+    return _arrayWithoutHoles(arr) || _iterableToArray(arr) || _unsupportedIterableToArray(arr) || _nonIterableSpread();
+  }
+  function _arrayWithoutHoles(arr) {
+    if (Array.isArray(arr)) return _arrayLikeToArray(arr);
+  }
   function _arrayWithHoles(arr) {
     if (Array.isArray(arr)) return arr;
+  }
+  function _iterableToArray(iter) {
+    if (typeof Symbol !== "undefined" && iter[Symbol.iterator] != null || iter["@@iterator"] != null) return Array.from(iter);
   }
   function _unsupportedIterableToArray(o, minLen) {
     if (!o) return;
@@ -80,6 +136,9 @@
     if (len == null || len > arr.length) len = arr.length;
     for (var i = 0, arr2 = new Array(len); i < len; i++) arr2[i] = arr[i];
     return arr2;
+  }
+  function _nonIterableSpread() {
+    throw new TypeError("Invalid attempt to spread non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.");
   }
   function _nonIterableRest() {
     throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.");
@@ -302,6 +361,7 @@
     }, {
       key: "notify",
       value: function notify() {
+        // console.log(this.subs);
         this.subs.forEach(function (watcher) {
           return watcher.update();
         });
@@ -331,6 +391,7 @@
       value: function addDep(dep) {
         var id = dep.id;
         if (!this.depsId.has(id)) {
+          // 这里是为了去重dep {{name}} {{name}}只收集一次
           this.deps.push(dep);
           this.depsId.add(id);
           dep.addSub(this); // 让dep记住watcher
@@ -346,11 +407,72 @@
     }, {
       key: "update",
       value: function update() {
-        this.get(); // 重新渲染
+        // this.get() // 重新渲染
+        // 把当前的watcher暂存起来 异步更新
+        queueWatcher(this);
+      }
+    }, {
+      key: "run",
+      value: function run() {
+        console.log('更新了');
+        this.get();
       }
     }]);
     return Watcher;
-  }(); // 需要给每个属性增加一个dep 目的就是收集watcher
+  }();
+  var queue = [];
+  var watchers = new Set();
+  var pending = false;
+  function flushSchedulerQueue() {
+    var flushQueue = _toConsumableArray(queue);
+    queue = [];
+    watchers.clear();
+    pending = false;
+    flushQueue.forEach(function (q) {
+      return q.run();
+    }); // 更新的时候可能有新的watcher产生，重新放到queue中
+  }
+
+  function queueWatcher(watcher) {
+    var id = watcher.id;
+    if (!watchers.has(id)) {
+      queue.push(watcher);
+      watchers.add(id);
+      // 不管update执行多少次，最终只执行一次更新操作
+      if (!pending) {
+        nextTick(flushSchedulerQueue);
+        pending = true;
+      }
+    }
+  }
+  // 优雅降级
+  function timerFunc(flushCallbacks) {
+    if (window.Promise) {
+      Promise.resolve().then(flushCallbacks);
+    } else if (window.MutationObserver) ; else if (window.setImmediate) {
+      setImmediate(flushCallbacks);
+    } else {
+      setTimeout(flushCallbacks);
+    }
+  }
+  var callbacks = [];
+  var waiting = false;
+  function flushCallbacks() {
+    var cbs = _toConsumableArray(callbacks);
+    waiting = false;
+    callbacks = [];
+    cbs.forEach(function (cb) {
+      return cb();
+    });
+  }
+  function nextTick(cb) {
+    callbacks.push(cb);
+    if (!waiting) {
+      // setTimeout(flushCallbacks, 0);
+      timerFunc(flushCallbacks); // 实现优雅降级策略
+      waiting = true;
+    }
+  }
 
   function createElementVNode(vm, tag, data) {
     if (data == null) {
@@ -417,8 +539,8 @@
       var newElm = createElm(vnode);
       parentElm.removeChild(oldVNode);
       parentElm.insertBefore(newElm, oldVNode.nextsibiling);
-      console.log(vnode);
-      console.log(newElm);
+      // console.log(vnode);
+      // console.log(newElm);
       return newElm;
     }
   }
@@ -460,8 +582,17 @@
     var updateComponent = function updateComponent() {
       vm._update(vm._render());
     };
-    var watcher = new Watcher(vm, updateComponent, true);
-    console.log(watcher);
+    new Watcher(vm, updateComponent, true);
+    // console.log(watcher);
+  }
+
+  function callHook(vm, hook) {
+    var handlers = vm.$options[hook];
+    if (handlers) {
+      handlers.forEach(function (hook) {
+        return hook.call(vm);
+      });
+    }
   }
 
   // 重写数组的7个变异方法，并且保留数组原来的方法
@@ -601,10 +732,12 @@
     // 给Vue添加init方法
     Vue.prototype._init = function (options) {
       var vm = this;
-      vm.$options = options; // 将用户的选项挂载到实例上
+      vm.$options = mergeOptions(this.constructor.options, options); // 将用户的选项挂载到实例上
+      callHook(vm, 'beforeCreate'); // 调用beforeCreate生命周期钩子
 
       // 初始化数据
       initState(vm);
+      callHook(vm, 'created'); // 调用created生命周期钩子
       if (options.el) {
         vm.$mount(options.el);
       }
@@ -635,8 +768,10 @@
   function Vue(options) {
     this._init(options);
   }
+  Vue.prototype.$nextTick = nextTick;
   initMixin(Vue); // 扩展init方法
-  initLifeCycle(Vue); //
+  initLifeCycle(Vue); // 
+  initGlobalAPI(Vue);
 
   return Vue;
 
